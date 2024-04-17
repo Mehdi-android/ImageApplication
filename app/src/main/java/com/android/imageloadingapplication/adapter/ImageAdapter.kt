@@ -3,6 +3,7 @@ package com.android.imageloadingapplication.adapter
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -13,6 +14,7 @@ import android.widget.ImageView
 import android.widget.ProgressBar
 import com.android.imageloadingapplication.R
 import com.android.imageloadingapplication.models.ImagesItem
+import com.android.imageloadingapplication.repository.CacheRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -21,9 +23,10 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 
-class ImageAdapter(private val context: Context, private val images: List<ImagesItem>) :
+class ImageAdapter(private val context: Context, private val images: List<ImagesItem>, private val cacheRepository: CacheRepository) :
     BaseAdapter() {
     private val imageCache = HashMap<String, Bitmap?>()
+    private val CACHE_DIRECTORY = "image_cache"
     override fun getCount(): Int {
         return images.size
     }
@@ -53,11 +56,48 @@ class ImageAdapter(private val context: Context, private val images: List<Images
         imageView.setImageDrawable(null)
         // Load image into ImageView using coroutine
         val imageUrl = (getItem(position) as ImagesItem).getImageUrl()
-        imageView.loadImageAsync(imageUrl, progressBar)
+        CoroutineScope(Dispatchers.Main).launch {
+            val bitmap = cacheRepository.loadBitmapFromCache(cacheRepository.generateUniqueFilename(imageUrl))
+            if (bitmap != null) {
+                imageView.setImageBitmap(bitmap)
+            } else {
+                // If not found in cache, fetch from network
+                fetchAndCacheImage(imageUrl, imageView, progressBar)
+            }
+        }
 
         return itemView
     }
+    private suspend fun fetchAndCacheImage(imageUrl: String, imageView: ImageView, progressBar: ProgressBar) {
+        val bitmap = fetchImageFromUrl(imageUrl)
+        if (bitmap != null) {
+            imageView.setImageBitmap(bitmap)
+            // Save fetched image to disk cache
+            cacheRepository.saveBitmapToCache(bitmap, cacheRepository.generateUniqueFilename(imageUrl))
+        }else{
+            imageView.setImageResource(R.drawable.loading)
+        }
+        progressBar.visibility = View.GONE
+    }
 
+    private suspend fun fetchImageFromUrl(imageUrl: String): Bitmap? {
+        return withContext(Dispatchers.IO) {
+            try {
+                val url = URL(imageUrl)
+                val connection = url.openConnection() as HttpURLConnection
+                connection.connect()
+                val inputStream = connection.inputStream
+                BitmapFactory.decodeStream(inputStream)
+            } catch (e: IOException) {
+                null
+            }
+        }
+    }
+
+  /*  private fun getFileNameFromUrl(url: String): String {
+        val uri = Uri.parse(url)
+        return uri.lastPathSegment ?: ""
+    }
     private fun ImageView.loadImageAsync(imageUrl: String, progressBar: ProgressBar) {
         val job = CoroutineScope(Dispatchers.Main).launch {
             progressBar.visibility = View.VISIBLE // Show progress bar
@@ -104,6 +144,6 @@ class ImageAdapter(private val context: Context, private val images: List<Images
             }
             bitmap
         }
-    }
+    }*/
 
 }

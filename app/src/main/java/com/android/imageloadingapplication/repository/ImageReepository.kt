@@ -6,6 +6,7 @@ import com.android.imageloadingapplication.models.ImagesItem
 import com.android.imageloadingapplication.retrofit.APIService
 import javax.inject.Inject
 sealed class Result<out T> {
+    object Loading : Result<Nothing>()
     data class Success<out T>(val data: T) : Result<T>()
     data class Error(val exception: Exception) : Result<Nothing>()
 }
@@ -17,6 +18,7 @@ class ImageReepository @Inject constructor(private val apiService: APIService) {
 
 
     suspend fun getImages(limit: Int) {
+        _images.postValue(Result.Loading)
         val result = apiService.getImages(limit)
         if (result.isSuccessful && result.body() != null) {
             _images.postValue(Result.Success(result.body()!!))

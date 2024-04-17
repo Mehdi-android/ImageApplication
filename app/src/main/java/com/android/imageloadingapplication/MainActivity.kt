@@ -10,6 +10,7 @@ import androidx.databinding.DataBindingUtil
 import androidx.lifecycle.ViewModelProvider
 import com.android.imageloadingapplication.adapter.ImageAdapter
 import com.android.imageloadingapplication.databinding.ActivityMainBinding
+import com.android.imageloadingapplication.repository.CacheRepository
 import com.android.imageloadingapplication.viewmodel.MainViewModel
 import com.android.imageloadingapplication.viewmodel.MainViewModelFactory
 import javax.inject.Inject
@@ -32,28 +33,36 @@ class MainActivity : AppCompatActivity() {
         mainViewModel.imagesLiveData.observe(this, {
             when (it) {
                 is com.android.imageloadingapplication.repository.Result.Success -> {
-                    val adapter = ImageAdapter(this, it.data)
+                    binding.progressbar.visibility = View.GONE
+                    val adapter = ImageAdapter(this, it.data, CacheRepository(this))
                     binding.gridView.adapter = adapter
                 }
 
                 is com.android.imageloadingapplication.repository.Result.Error -> {
                     // Handle error: display a message or retry option
+                    binding.progressbar.visibility = View.GONE
                     Toast.makeText(this, "Error: ${it.exception.message}", Toast.LENGTH_SHORT)
                         .show()
                 }
+                is com.android.imageloadingapplication.repository.Result.Loading ->{
+                    binding.progressbar.visibility = View.VISIBLE
+                }
+
             }
         })
 
+/*
         mainViewModel.loading.observe(this, { isLoading ->
             // Show or hide loading indicator based on the isLoading value
             if (isLoading) {
                 // Show loading indicator
-                binding.progressbar.visibility = View.VISIBLE
+
             } else {
                 // Hide loading indicator
-                binding.progressbar.visibility = View.GONE
+
             }
         })
+*/
 
         mainViewModel.error.observe(this, { errorMessage ->
             // Display error message if not null
